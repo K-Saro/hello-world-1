@@ -1,0 +1,58 @@
+with slct as (select name
+              from salesforce.opportunity
+              where stagename = 'In backoffice'),
+
+     slct1 as (select opportunity_name, max(to_date(edit_date, 'dd.mm.yyyy')) as dateib
+               from salesforce_hist.sf_histrows
+               where field___event = 'Stage'
+                 and new_value = 'In backoffice'
+               group by opportunity_name),
+     slct2 as (select opportunity_name, max(to_date(edit_date, 'dd.mm.yyyy')) as last_created
+               from salesforce_hist.sf_histrows
+               where field___event = 'Created.'
+               group by opportunity_name)
+
+
+select slct.name, --slct1.dateib, slct2.last_created,
+       case
+           when slct1.dateib is not null then current_date - dateib
+           else current_date - slct2.last_created
+           end as duration,
+       'open'  as status
+from slct
+         left join slct1 on slct.name = slct1.opportunity_name
+         join slct2 on slct.name = slct2.opportunity_name;
+
+ with slct4 as (select *, to_date(edit_date, 'dd.mm.yyyy') as calcdate
+                        from salesforce_hist.sf_histrows
+                        where field___event = 'Stage'
+                          and new_value = 'Calculated'
+                          and old_value = 'In backoffice'
+                          and to_date(edit_date, 'dd.mm.yyyy') >= date_trunc('week', current_date)),
+       slct2 as (select opportunity_name, max(to_date(edit_date, 'dd.mm.yyyy')) as last_created
+               from salesforce_hist.sf_histrows
+               where field___event = 'Created.'
+               group by opportunity_name),
+              slct5 as (select opportunity_name, max(to_date(edit_date, 'dd.mm.yyyy')) as ibdate
+                        from salesforce_hist.sf_histrows
+                        where field___event = 'Stage'
+                          and new_value = 'In backoffice'
+                          and opportunity_name not in (select name
+                                                       from salesforce.opportunity
+                                                       where stagename = 'In backoffice')
+
+                        group by opportunity_name)
+         select slct4.edited_by,
+                slct4.old_value,
+                slct4.new_value,
+                slct4.opportunity_name,
+                case
+                    when slct5.ibdate is null then slct4.calcdate - slct2.last_created
+                    when slct4.calcdate = slct5.ibdate then '1'
+                    else slct4.calcdate - slct5.ibdate
+                    end as duration
+         from slct4
+                  left join slct5 on slct4.opportunity_name = slct5.opportunity_name
+                  join slct2 on slct4.opportunity_name = slct2.opportunity_name
+
+order by duration desc;
