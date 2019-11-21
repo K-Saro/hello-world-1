@@ -1,0 +1,28 @@
+select termination_at::TIMESTAMP::DATE as terminationdate, count(id) as ML
+from public.contract_contract
+where termination_at > current_date - interval '30' day
+group by terminationdate
+order by terminationdate desc
+;
+
+
+select cc.id, cc.status, t.termination_at, t.type
+from contract.contract cc
+join contract.contract_snapshot cs on cs.id=(SELECT cs2.id FROM contract.contract_snapshot cs2 WHERE cs2.contract_id = cc.id ORDER BY cs2.id DESC LIMIT 1)
+join contract.termination t on t.id=(SELECT t2.id FROM contract.termination t2 WHERE t2.contract_snapshot_id = cs.id ORDER BY t2.id DESC LIMIT 1)
+where cc.status in('TERMINATED', 'REVIEW','ACCOUNTING','CLOSED') and t.termination_at > current_date - interval '30' day and t.termination_at <=current_date 
+;
+
+select cancelation_at, count(id)
+from public.contract_contract
+where cancelation_at is not null and cancelation_at between current_date-interval '12' month and current_date
+group by cancelation_at
+order by cancelation_at desc;
+
+
+select cancelation_at, count(contract_id)
+from contract.cancelation
+group by cancelation_at
+order by cancelation_at desc
+
+
